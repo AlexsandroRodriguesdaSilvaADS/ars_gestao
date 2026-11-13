@@ -1,4 +1,120 @@
 /**
+ * CONTROLE DE PERFIL FINANCEIRO E TEMAS (DARK/LIGHT)
+ */
+// Ativado por padrão (true) caso o localStorage esteja vazio
+let userFinancialVisible = localStorage.getItem('autotech_profile_visible') === null ? true : localStorage.getItem('autotech_profile_visible') === 'true';
+let currentTheme = localStorage.getItem('autotech_theme') || 'dark';
+let financialPassword = localStorage.getItem('autotech_financial_pass') || '1234';
+
+/**
+ * Alterna ou solicita senha para o Perfil Financeiro
+ */
+function toggleFinancialProfile() {
+    if (userFinancialVisible) {
+        userFinancialVisible = false;
+        localStorage.setItem('autotech_profile_visible', userFinancialVisible);
+        updateProfileButtonUI();
+        refreshUI();
+        showToast('Perfil Operacional ativado: Informações financeiras ocultas.', 'info');
+    } else {
+        openPasswordModal();
+    }
+}
+
+function openPasswordModal() {
+    const bodyHtml = `
+        <div class="space-y-3">
+            <p class="text-xs text-slate-400">Insira a senha de acesso para desbloquear as informações financeiras e administrativas.</p>
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">Senha de Acesso</label>
+                <input type="password" id="financial-pass-input" placeholder="Digite a senha (padrão: 1234)" class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+            </div>
+        </div>
+    `;
+    const footerHtml = `
+        <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button>
+        <button type="button" onclick="verifyFinancialPassword()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold">Desbloquear</button>
+    `;
+    
+    openModal({
+        title: 'Proteção de Senha — Perfil Financeiro',
+        icon: 'fa-lock',
+        bodyHtml,
+        footerHtml,
+        maxWidth: 'max-w-md'
+    });
+
+    setTimeout(() => {
+        const input = document.getElementById('financial-pass-input');
+        if (input) {
+            input.focus();
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') verifyFinancialPassword();
+            });
+        }
+    }, 100);
+}
+
+function verifyFinancialPassword() {
+    const inputVal = document.getElementById('financial-pass-input').value;
+    if (inputVal === financialPassword) {
+        userFinancialVisible = true;
+        localStorage.setItem('autotech_profile_visible', userFinancialVisible);
+        updateProfileButtonUI();
+        refreshUI();
+    closeModal();
+        showToast('Perfil Administrativo desbloqueado com sucesso!', 'success');
+    } else {
+        showToast('Senha incorreta! Tente novamente.', 'error');
+        const input = document.getElementById('financial-pass-input');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+    }
+}
+
+function updateProfileButtonUI() {
+    const btn = document.getElementById('profile-toggle-btn');
+    if (!btn) return;
+    if (userFinancialVisible) {
+        btn.innerHTML = `<i class="fa-solid fa-eye text-emerald-400"></i> <span class="hidden sm:inline">Financeiro: Visível</span>`;
+        btn.className = "flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition text-white";
+    } else {
+        btn.innerHTML = `<i class="fa-solid fa-lock text-amber-400"></i> <span class="hidden sm:inline">Financeiro: Protegido</span>`;
+        btn.className = "flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition text-amber-300";
+    }
+}
+
+function toggleTheme() {
+    currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('autotech_theme', currentTheme);
+    applyTheme();
+    showToast(`Tema alterado para ${currentTheme === 'dark' ? 'Escuro' : 'Claro'}`, 'info');
+}
+
+function applyTheme() {
+    if (currentTheme === 'light') {
+        document.body.classList.add('light-theme');
+    } else {
+        document.body.classList.remove('light-theme');
+    }
+    updateThemeButtonUI();
+}
+
+function updateThemeButtonUI() {
+    const btn = document.getElementById('theme-toggle-btn');
+    if (!btn) return;
+    if (currentTheme === 'dark') {
+        btn.innerHTML = `<i class="fa-solid fa-moon text-blue-400"></i> <span class="hidden sm:inline">Escuro</span>`;
+    } else {
+        btn.innerHTML = `<i class="fa-solid fa-sun text-amber-400"></i> <span class="hidden sm:inline">Claro</span>`;
+    }
+}
+
+
+
+/**
  * ARQUITETURA DE DADOS E PERSISTÊNCIA (localStorage)
  */
 const STORAGE_KEY = 'autotech_oficina_db_v1';
@@ -65,10 +181,20 @@ function generateId(prefix = 'id') {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 }
 
+// ATUALIZADA
 function formatCurrency(val) {
+    if (!userFinancialVisible) {
+        return 'R$ •••••'; // Oculta valores financeiros se o perfil estiver restrito
+    }
     const num = parseFloat(val) || 0;
     return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
+
+
+/*function formatCurrency(val) {
+    const num = parseFloat(val) || 0;
+    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}*/
 
 function formatDateTime(isoStr) {
     if (!isoStr) return '-';
@@ -273,6 +399,9 @@ function refreshUI() {
             area.innerHTML = renderDatabaseView();
             break;
     }
+
+    updateProfileButtonUI();
+    updateThemeButtonUI();
 }
 
 /**
@@ -1992,4 +2121,7 @@ function seedDemoData(notify = true) {
 window.addEventListener('DOMContentLoaded', () => {
     loadDatabase();
     refreshUI();
+
+    applyTheme();
+    updateProfileButtonUI();
 });
