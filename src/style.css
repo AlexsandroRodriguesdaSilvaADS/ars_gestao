@@ -30,56 +30,113 @@ body {
 }
 
 /* Regras @media print para emissão limpa de OS e Comprovante de Check-out em folha A4 */
-/* Regras Globais de Impressão (A4) */
-    @media print {
-        body * {
-            visibility: hidden;
-        }
-        #print-container, #print-container * {
-            visibility: visible;
-        }
-        #print-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            background: #ffffff !important;
-            color: #0f172a !important;
-        }
-        @page {
-            size: A4;
-            margin: 10mm 12mm;
-        }
+@media print {
+    /* Oculta toda a interface do sistema */
+    body * {
+        visibility: hidden !important;
+    }
+    
+    /* Torna visível apenas o container de impressão */
+    #print-container, #print-container * {
+        visibility: visible !important;
+    }
+    
+    /* Reseta o posicionamento e força o fundo branco na folha A4 */
+    #print-container {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 10mm !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+
+/* Estilos base para as caixas e tabelas impressas */
+.print-box {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #ffffff !important;
+}
+
+.print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    font-size: 8.5pt;
+}
+
+.print-table th, .print-table td {
+    border: 1px solid #cbd5e1;
+    padding: 5px 8px;
+}
+
+.print-table th {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    font-weight: bold;
+}
+
+
+/* Regras Globais de Impressão (A4) 
+@media print {
+    body * {
+        visibility: hidden;
     }
 
-    /* Estilização dos blocos e tabelas gerados no printDocument */
-    .print-box {
-        background: #f8fafc;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 10px;
-        margin-bottom: 10px;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
+    #print-container,
+    #print-container * {
+        visibility: visible;
     }
 
-    .print-table {
+    #print-container {
+        position: absolute;
+        left: 0;
+        top: 0;
         width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 10px;
-        font-size: 8.5pt;
+        background: #ffffff !important;
+        color: #0f172a !important;
     }
 
-    .print-table th, 
-    .print-table td {
-        border: 1px solid #cbd5e1;
-        padding: 5px 8px;
+    @page {
+        size: A4;
+        margin: 10mm 12mm;
     }
+}
 
-    .print-table th {
-        background-color: #f1f5f9;
-        font-weight: bold;
-        text-align: left;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
+.print-box {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 10px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    font-size: 8.5pt;
+}
+
+.print-table th,
+.print-table td {
+    border: 1px solid #cbd5e1;
+    padding: 5px 8px;
+}
+
+.print-table th {
+    background-color: #f1f5f9;
+    font-weight: bold;
+    text-align: left;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}*/

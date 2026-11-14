@@ -35,7 +35,7 @@ function openPasswordModal() {
         <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button>
         <button type="button" onclick="verifyFinancialPassword()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold">Desbloquear</button>
     `;
-    
+
     openModal({
         title: 'Proteção de Senha — Perfil Financeiro',
         icon: 'fa-lock',
@@ -62,7 +62,7 @@ function verifyFinancialPassword() {
         localStorage.setItem('autotech_profile_visible', userFinancialVisible);
         updateProfileButtonUI();
         refreshUI();
-    closeModal();
+        closeModal();
         showToast('Perfil Administrativo desbloqueado com sucesso!', 'success');
     } else {
         showToast('Senha incorreta! Tente novamente.', 'error');
@@ -114,6 +114,30 @@ function updateThemeButtonUI() {
 
 
 
+// CADASTRAR MECÂNICOS
+function promptNewMechanic() {
+    const name = prompt('Digite o nome do novo mecânico/técnico:');
+    if (name && name.trim()) {
+        const trimmed = name.trim();
+        if (!db.mechanics.includes(trimmed)) {
+            db.mechanics.push(trimmed);
+            saveDatabase();
+        }
+        const select = document.getElementById('diag-mechanic-select');
+        if (select) {
+            const opt = document.createElement('option');
+            opt.value = trimmed;
+            opt.textContent = trimmed;
+            opt.selected = true;
+            select.appendChild(opt);
+        }
+        showToast(`Técnico "${trimmed}" adicionado à lista!`, 'success');
+    }
+}
+
+
+
+
 /**
  * ARQUITETURA DE DADOS E PERSISTÊNCIA (localStorage)
  */
@@ -131,7 +155,8 @@ let db = {
     lastOsNumber: 0,
     clients: [],   // { id, name, document, phone, email, createdAt }
     vehicles: [],  // { id, clientId, plate, brandModel, year, engine, color }
-    orders: []     // Fluxo completo: 'DIAGNOSTICO' | 'OS' | 'CHECKOUT' | 'CONCLUIDO'
+    orders: [],     // Fluxo completo: 'DIAGNOSTICO' | 'OS' | 'CHECKOUT' | 'CONCLUIDO'
+    mechanics: ['Marcos Silva (Mestre)', 'André Souza', 'Carlos Técnico']
 };
 
 let currentTab = 'patio';
@@ -140,7 +165,7 @@ let searchQuery = '';
 /**
  * Inicializa o banco de dados a partir do localStorage
  */
-function loadDatabase() {
+/*function loadDatabase() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
@@ -154,7 +179,31 @@ function loadDatabase() {
         showToast('Erro ao ler dados locais. Iniciando base limpa.', 'error');
     }
     updateHeaderWorkshop();
+}*/
+
+
+function loadDatabase() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            db = { ...db, ...parsed };
+            // Se não houver mecânicos salvos, extrai dos registros existentes ou usa padrão
+            if (!db.mechanics || db.mechanics.length === 0) {
+                const unique = [...new Set(db.orders.map(o => o.diagnosis?.mechanicName).filter(Boolean))];
+                db.mechanics = unique.length > 0 ? unique : ['Marcos Silva (Mestre)', 'André Souza'];
+            }
+        } else {
+            seedDemoData(false);
+        }
+    } catch (err) {
+        console.error('Erro ao carregar localStorage:', err);
+        showToast('Erro ao ler dados locais. Iniciando base limpa.', 'error');
+    }
+    updateHeaderWorkshop();
 }
+
+
 
 /**
  * Salva todo o estado no localStorage
@@ -182,6 +231,13 @@ function generateId(prefix = 'id') {
 }
 
 // ATUALIZADA
+/*function formatCurrency(val) {
+    const num = parseFloat(val) || 0;
+    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}*/
+
+
+
 function formatCurrency(val) {
     if (!userFinancialVisible) {
         return 'R$ •••••'; // Oculta valores financeiros se o perfil estiver restrito
@@ -191,10 +247,7 @@ function formatCurrency(val) {
 }
 
 
-/*function formatCurrency(val) {
-    const num = parseFloat(val) || 0;
-    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}*/
+
 
 function formatDateTime(isoStr) {
     if (!isoStr) return '-';
@@ -1137,7 +1190,8 @@ function submitCheckin() {
  * ETAPA 2: MODAL DE DIAGNÓSTICO TÉCNICO
  * =====================================================================
  */
-function openDiagnosisModal(orderId) {
+// ATUALIZADA
+/*function openDiagnosisModal(orderId) {
     const order = db.orders.find(o => o.id === orderId);
     if (!order) return;
     const client = db.clients.find(c => c.id === order.clientId) || {};
@@ -1206,9 +1260,95 @@ function openDiagnosisModal(orderId) {
         bodyHtml,
         footerHtml
     });
+}*/
+
+
+function openDiagnosisModal(orderId) {
+    const order = db.orders.find(o => o.id === orderId);
+    if (!order) return;
+    const client = db.clients.find(c => c.id === order.clientId) || {};
+    const vehicle = db.vehicles.find(v => v.id === order.vehicleId) || {};
+
+    const mechanicOptions = (db.mechanics || []).map(m =>
+        `<option value="${escapeHtml(m)}" ${order.diagnosis?.mechanicName === m ? 'selected' : ''}>${escapeHtml(m)}</option>`
+    ).join('');
+
+    const bodyHtml = `
+                <div class="space-y-4">
+                    <!-- Resumo do Check-in -->
+                    <div class="bg-slate-950 text-white p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold text-blue-400">OS #${formatOsNumber(order.osNumber)}</span>
+                                <span class="bg-slate-800 px-2 py-0.5 rounded font-mono text-xs font-bold text-blue-300">${escapeHtml(vehicle.plate)}</span>
+                                <span class="text-sm font-bold">${escapeHtml(vehicle.brandModel)}</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1">Cliente: <strong class="text-slate-200">${escapeHtml(client.name)}</strong> • Entrada: ${Number(order.checkin.km).toLocaleString('pt-BR')} km • Combustível: ${escapeHtml(order.checkin.fuel)}</p>
+                        </div>
+                        <div class="bg-slate-900 p-2.5 rounded-lg text-xs max-w-md border border-slate-800">
+                            <span class="text-amber-400 font-bold block mb-0.5">Queixa / Relato do Cliente:</span>
+                            <span class="text-slate-300">${escapeHtml(order.checkin.complaint)}</span>
+                        </div>
+                    </div>
+
+                    <!-- Formulário Técnico -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">Códigos de Falha (Scanner OBD-II / DTC)</label>
+                            <input type="text" id="diag-dtc" value="${escapeHtml(order.diagnosis?.dtcCodes || '')}" placeholder="Ex: P0300, P0171 - Falha de ignição cilindro 1" class="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">Mecânico / Técnico Responsável *</label>
+                            <div class="flex gap-2">
+                                <select id="diag-mechanic-select" class="flex-1 bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                                    <option value="">-- Selecione o técnico --</option>
+                                    ${mechanicOptions}
+                                </select>
+                                <button type="button" onclick="promptNewMechanic()" class="bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition" title="Cadastrar Novo Mecânico">
+                                    <i class="fa-solid fa-user-plus"></i> Novo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Testes Realizados (Bateria, Alternador, Pressão Linha, Compressão, etc.)</label>
+                        <input type="text" id="diag-tests" value="${escapeHtml(order.diagnosis?.testsPerformed || '')}" placeholder="Ex: Teste de alternador 14.2V OK; Pressão bomba combustível 3.8 bar..." class="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Parecer Técnico Detalhado (Causa Raiz) *</label>
+                        <textarea id="diag-report" rows="3" placeholder="Descreva a causa raiz identificada após inspeção..." class="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">${escapeHtml(order.diagnosis?.technicalReport || '')}</textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Peças & Serviços Recomendados (Resumo p/ Orçamento)</label>
+                        <textarea id="diag-recommended" rows="2" placeholder="Ex: 1x Jogo de Velas Iridium, 1x Bobina de Ignição, Limpeza de Bicos e Mão de Obra." class="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">${escapeHtml(order.diagnosis?.recommendedItems || '')}</textarea>
+                    </div>
+                </div>
+            `;
+
+    const footerHtml = `
+                <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800 transition">Cancelar</button>
+                <button type="button" onclick="saveDiagnosis('${order.id}', false)" class="bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition">
+                    Salvar Rascunho
+                </button>
+                <button type="button" onclick="saveDiagnosis('${order.id}', true)" class="bg-amber-600 hover:bg-amber-500 text-white px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow flex items-center gap-2 transition">
+                    <i class="fa-solid fa-arrow-right"></i> Aprovar Diagnóstico & Gerar OS
+                </button>
+            `;
+
+    openModal({
+        title: `Etapa 2: Diagnóstico Técnico — OS #${formatOsNumber(order.osNumber)}`,
+        icon: 'fa-stethoscope',
+        bodyHtml,
+        footerHtml
+    });
 }
 
-function saveDiagnosis(orderId, advanceToOs) {
+
+// ATUALIZADA
+/*function saveDiagnosis(orderId, advanceToOs) {
     const order = db.orders.find(o => o.id === orderId);
     if (!order) return;
 
@@ -1241,7 +1381,45 @@ function saveDiagnosis(orderId, advanceToOs) {
         closeModal();
         showToast('Rascunho de diagnóstico salvo.', 'info');
     }
+}*/
+
+
+function saveDiagnosis(orderId, advanceToOs) {
+    const order = db.orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const mechanicName = document.getElementById('diag-mechanic-select').value.trim();
+    const technicalReport = document.getElementById('diag-report').value.trim();
+
+    if (advanceToOs && (!mechanicName || !technicalReport)) {
+        showToast('Selecione o Técnico Responsável e preencha o Parecer Técnico antes de avançar para OS.', 'warning');
+        return;
+    }
+
+    order.diagnosis = {
+        dtcCodes: document.getElementById('diag-dtc').value.trim(),
+        mechanicName,
+        testsPerformed: document.getElementById('diag-tests').value.trim(),
+        technicalReport,
+        recommendedItems: document.getElementById('diag-recommended').value.trim(),
+        diagnosedAt: new Date().toISOString()
+    };
+
+    if (advanceToOs) {
+        order.stage = 'OS';
+        order.osSubStatus = 'Aguardando Aprovação';
+        saveDatabase();
+        closeModal();
+        showToast(`Diagnóstico concluído! OS #${formatOsNumber(order.osNumber)} aberta para orçamento/execução.`, 'success');
+        openOsModal(order.id);
+    } else {
+        saveDatabase();
+        closeModal();
+        showToast('Rascunho de diagnóstico salvo.', 'info');
+    }
 }
+
+
 
 /**
  * =====================================================================
@@ -1644,7 +1822,7 @@ function submitCheckout(orderId, shouldPrintReceipt) {
  * =====================================================================
  * IMPRESSÃO FORMATADA A4 (@media print) — OS E RECIBO DE CHECK-OUT
  * =====================================================================
- */
+ *
 function printDocument(orderId, docType) {
     const order = db.orders.find(o => o.id === orderId);
     if (!order) return;
@@ -1801,7 +1979,215 @@ function printDocument(orderId, docType) {
     setTimeout(() => {
         window.print();
     }, 150);
+}*/
+
+
+function printDocument(orderId, docType) {
+    const order = db.orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const client = db.clients.find(c => c.id === order.clientId) || {};
+    const vehicle = db.vehicles.find(v => v.id === order.vehicleId) || {};
+    const totals = calculateOrderTotals(order);
+    const ws = db.workshop;
+    const isCheckout = docType === 'CHECKOUT';
+
+    const docTitle = isCheckout
+        ? `COMPROVANTE DE ENTREGA, GARANTIA E RECIBO — OS #${formatOsNumber(order.osNumber)}`
+        : `ORDEM DE SERVIÇO AUTOMOTIVA — OS #${formatOsNumber(order.osNumber)}`;
+
+    const partsRows = (order.parts || []).map((p, i) => `
+        <tr>
+            <td>${i + 1}</td>
+            <td>${escapeHtml(p.desc)}</td>
+            <td>${escapeHtml(p.code || '-')}</td>
+            <td style="text-align:center;">${p.qty}</td>
+            <td style="text-align:right;">${formatCurrency(p.unitPrice)}</td>
+            <td style="text-align:right; font-weight:bold;">${formatCurrency(p.qty * p.unitPrice)}</td>
+        </tr>
+    `).join('') || `<tr><td colspan="6" style="text-align:center; color:#64748b;">Nenhuma peça lançada nesta OS.</td></tr>`;
+
+    const servicesRows = (order.services || []).map((s, i) => `
+        <tr>
+            <td>${i + 1}</td>
+            <td>${escapeHtml(s.desc)}</td>
+            <td style="text-align:center;">${s.qty}</td>
+            <td style="text-align:right;">${formatCurrency(s.unitPrice)}</td>
+            <td style="text-align:right; font-weight:bold;">${formatCurrency(s.qty * s.unitPrice)}</td>
+        </tr>
+    `).join('') || `<tr><td colspan="5" style="text-align:center; color:#64748b;">Nenhum serviço lançado nesta OS.</td></tr>`;
+
+    // Cria uma nova janela limpa isolada do app principal
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <title>${docTitle}</title>
+            <style>
+                body {
+                    font-family: 'Inter', Arial, sans-serif;
+                    color: #0f172a;
+                    background: #ffffff;
+                    margin: 0;
+                    padding: 12mm;
+                    font-size: 10pt;
+                }
+                .print-box {
+                    border: 1px solid #cbd5e1;
+                    border-radius: 6px;
+                    padding: 12px;
+                    margin-bottom: 12px;
+                    background-color: #ffffff;
+                }
+                .print-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 15px;
+                    font-size: 9pt;
+                }
+                .print-table th, .print-table td {
+                    border: 1px solid #cbd5e1;
+                    padding: 6px 8px;
+                }
+                .print-table th {
+                    background-color: #f1f5f9;
+                    color: #0f172a;
+                    font-weight: bold;
+                    text-align: left;
+                }
+            </style>
+        </head>
+        <body>
+            <!-- Cabeçalho da Oficina -->
+            <div class="print-box" style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc;">
+                <div>
+                    <h1 style="font-size:14pt; font-weight:800; margin:0; color:#0f172a;">${escapeHtml(ws.name)}</h1>
+                    <p style="font-size:8.5pt; margin:2px 0; color:#334155;">CNPJ: ${escapeHtml(ws.cnpj)} | Tel/WhatsApp: ${escapeHtml(ws.phone)}</p>
+                    <p style="font-size:8.5pt; margin:0; color:#334155;">${escapeHtml(ws.address)}</p>
+                </div>
+                <div style="text-align:right; border-left:2px solid #0f172a; padding-left:12px;">
+                    <div style="font-size:11pt; font-weight:800;">OS #${formatOsNumber(order.osNumber)}</div>
+                    <div style="font-size:8.5pt; color:#475569;">Entrada: ${formatDateTime(order.createdAt)}</div>
+                    ${isCheckout && order.checkout ? `<div style="font-size:8.5pt; color:#475569;">Saída: ${formatDateTime(order.checkout.completedAt)}</div>` : ''}
+                </div>
+            </div>
+
+            <!-- Faixa Título Documento -->
+            <div style="background:#0f172a; color:#ffffff; padding:8px 10px; font-weight:700; font-size:10pt; border-radius:4px; margin-bottom:12px; text-align:center;">
+                ${docTitle}
+            </div>
+
+            <!-- Dados do Cliente e Veículo -->
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+                <div class="print-box" style="margin-bottom:0;">
+                    <div style="font-weight:700; font-size:9pt; border-bottom:1px solid #cbd5e1; padding-bottom:4px; margin-bottom:6px;">DADOS DO CLIENTE</div>
+                    <p style="font-size:9pt; margin:3px 0;"><strong>Nome:</strong> ${escapeHtml(client.name)}</p>
+                    <p style="font-size:9pt; margin:3px 0;"><strong>CPF/CNPJ:</strong> ${escapeHtml(client.document || 'Não informado')}</p>
+                    <p style="font-size:9pt; margin:3px 0;"><strong>Telefone:</strong> ${escapeHtml(client.phone || '-')}</p>
+                </div>
+                <div class="print-box" style="margin-bottom:0;">
+                    <div style="font-weight:700; font-size:9pt; border-bottom:1px solid #cbd5e1; padding-bottom:4px; margin-bottom:6px;">DADOS DO VEÍCULO</div>
+                    <p style="font-size:9pt; margin:3px 0;"><strong>Veículo:</strong> ${escapeHtml(vehicle.brandModel)} (${escapeHtml(vehicle.year || '-')})</p>
+                    <p style="font-size:9pt; margin:3px 0;"><strong>Placa:</strong> <span style="font-family:monospace; font-weight:bold;">${escapeHtml(vehicle.plate)}</span> | <strong>Motor:</strong> ${escapeHtml(vehicle.engine || '-')}</p>
+                    <p style="font-size:9pt; margin:3px 0;"><strong>KM Entrada:</strong> ${Number(order.checkin.km).toLocaleString('pt-BR')} km ${order.checkout ? `| <strong>KM Saída:</strong> ${Number(order.checkout.kmOut).toLocaleString('pt-BR')} km` : ''}</p>
+                </div>
+            </div>
+
+            <!-- Checklist de Entrada & Diagnóstico -->
+            <div class="print-box">
+                <div style="font-weight:700; font-size:9pt; border-bottom:1px solid #cbd5e1; padding-bottom:4px; margin-bottom:6px;">CHECK-IN & DIAGNÓSTICO TÉCNICO</div>
+                <p style="font-size:8.5pt; margin:3px 0;"><strong>Checklist Entrada:</strong> Combustível: ${escapeHtml(order.checkin.fuel)} | Pneus: ${escapeHtml(order.checkin.tires)} | Luzes Painel: ${escapeHtml(order.checkin.dashLights)} | Avarias: ${escapeHtml(order.checkin.bodyDamage)}</p>
+                <p style="font-size:8.5pt; margin:3px 0;"><strong>Relato do Cliente:</strong> ${escapeHtml(order.checkin.complaint)}</p>
+                ${order.diagnosis?.technicalReport ? `
+                    <p style="font-size:8.5pt; margin:3px 0;"><strong>Laudo Técnico (${escapeHtml(order.diagnosis.mechanicName || 'Técnico')}):</strong> ${escapeHtml(order.diagnosis.technicalReport)} ${order.diagnosis.dtcCodes ? `[DTC: ${escapeHtml(order.diagnosis.dtcCodes)}]` : ''}</p>
+                ` : ''}
+            </div>
+
+            <!-- Tabela de Peças -->
+            <div style="font-weight:700; font-size:9pt; margin-bottom:5px;">PEÇAS E INSUMOS UTILIZADOS</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th style="width:30px;">#</th>
+                        <th>Descrição</th>
+                        <th style="width:90px;">Ref/Cód</th>
+                        <th style="width:45px; text-align:center;">Qtd</th>
+                        <th style="width:85px; text-align:right;">Unitário</th>
+                        <th style="width:90px; text-align:right;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>${partsRows}</tbody>
+            </table>
+
+            <!-- Tabela de Serviços -->
+            <div style="font-weight:700; font-size:9pt; margin-bottom:5px;">MÃO DE OBRA E SERVIÇOS EXECUTADOS</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th style="width:30px;">#</th>
+                        <th>Descrição do Serviço</th>
+                        <th style="width:65px; text-align:center;">Horas/Qtd</th>
+                        <th style="width:85px; text-align:right;">Unitário</th>
+                        <th style="width:90px; text-align:right;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>${servicesRows}</tbody>
+            </table>
+
+            <!-- Totais -->
+            <div class="print-box" style="display:flex; justify-content:space-between; align-items:flex-start; background:#f8fafc;">
+                <div style="font-size:8.5pt; max-width:60%;">
+                    ${isCheckout && order.checkout ? `
+                        <p style="margin:2px 0;"><strong>Forma de Pagamento:</strong> ${escapeHtml(order.checkout.paymentMethod)} (${escapeHtml(order.checkout.paymentStatus)})</p>
+                        <p style="margin:2px 0;"><strong>Garantia:</strong> ${escapeHtml(order.checkout.warranty)}</p>
+                        <p style="margin:2px 0;"><strong>Conferência:</strong> Teste rodagem: ${order.checkout.roadTest ? 'Sim' : 'Não'} | Peças velhas devolvidas: ${order.checkout.oldPartsReturned ? 'Sim' : 'Não'}</p>
+                        ${order.checkout.notes ? `<p style="margin:2px 0;"><strong>Obs:</strong> ${escapeHtml(order.checkout.notes)}</p>` : ''}
+                    ` : `
+                        <p style="margin:2px 0;"><strong>Status da OS:</strong> ${escapeHtml(order.osSubStatus)}</p>
+                        <p style="margin:2px 0; color:#475569;">Orçamento sujeito à aprovação prévia do cliente antes da execução de serviços adicionais.</p>
+                    `}
+                </div>
+                <div style="text-align:right; font-size:9.5pt;">
+                    <div>Total Peças: <strong>${formatCurrency(totals.partsTotal)}</strong></div>
+                    <div>Total Serviços: <strong>${formatCurrency(totals.servicesTotal)}</strong></div>
+                    ${totals.discountAmount > 0 ? `<div>Desconto: <strong>-${formatCurrency(totals.discountAmount)}</strong></div>` : ''}
+                    <div style="font-size:11pt; font-weight:800; border-top:1px solid #0f172a; margin-top:6px; padding-top:6px;">
+                        TOTAL GERAL: ${formatCurrency(totals.grandTotal)}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assinaturas -->
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:40px; margin-top:35px; text-align:center; font-size:8.5pt;">
+                <div>
+                    <div style="border-top:1px solid #0f172a; padding-top:6px;">
+                        <strong>${escapeHtml(ws.name)}</strong><br>Responsável Técnico / Consultor
+                    </div>
+                </div>
+                <div>
+                    <div style="border-top:1px solid #0f172a; padding-top:6px;">
+                        <strong>${escapeHtml(client.name)}</strong><br>${isCheckout ? 'Declaro ter recebido o veículo e o termo de garantia' : 'Autorizo a execução dos serviços acima'}
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                window.onload = function() {
+                    setTimeout(() => {
+                        window.print();
+                        window.close();
+                    }, 250);
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
 }
+
+
 
 /**
  * =====================================================================
