@@ -4,7 +4,7 @@
 // Ativado por padrão (true) caso o localStorage esteja vazio
 let userFinancialVisible = localStorage.getItem('autotech_profile_visible') === null ? true : localStorage.getItem('autotech_profile_visible') === 'true';
 let currentTheme = localStorage.getItem('autotech_theme') || 'dark';
-let financialPassword = localStorage.getItem('autotech_financial_pass') || '1234';
+let financialPassword = localStorage.getItem('autotech_financial_pass') || '047874';
 
 /**
  * Alterna ou solicita senha para o Perfil Financeiro
@@ -27,7 +27,7 @@ function openPasswordModal() {
             <p class="text-xs text-slate-400">Insira a senha de acesso para desbloquear as informações financeiras e administrativas.</p>
             <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1">Senha de Acesso</label>
-                <input type="password" id="financial-pass-input" placeholder="Digite a senha (padrão: 1234)" class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                <input type="password" id="financial-pass-input" placeholder="Digite a senha" class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
             </div>
         </div>
     `;
@@ -141,16 +141,16 @@ function promptNewMechanic() {
 /**
  * ARQUITETURA DE DADOS E PERSISTÊNCIA (localStorage)
  */
-const STORAGE_KEY = 'autotech_oficina_db_v1';
+const STORAGE_KEY = 'ars_mecanico_automotivo_db_v1';
 
 // Estado global da aplicação
 let db = {
     workshop: {
-        name: 'AUTOTECH CENTRO AUTOMOTIVO LTDA',
-        cnpj: '12.345.678/0001-99',
-        phone: '(11) 98765-4321',
-        address: 'Av. das Engrenagens, 1500 - Distrito Industrial - São Paulo/SP',
-        email: 'contato@autotechoficina.com.br'
+        name: 'ARS MECÂNICO AUTOMOTIVO',
+        cnpj: '047.874.904-00',
+        phone: '(81) 99809-0037',
+        address: 'Rua Maria Merandoilina, 800, Riachão, Caruaru/PE',
+        email: 'autonomosslm@google.com.br'
     },
     lastOsNumber: 0,
     clients: [],   // { id, name, document, phone, email, createdAt }
