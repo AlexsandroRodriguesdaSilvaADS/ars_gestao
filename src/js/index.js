@@ -1,14 +1,145 @@
+window.addEventListener('DOMContentLoaded', () => {
+    loadDatabase();
+    applyTheme();
+
+    // Se não houver perfil logado na sessão, bloqueia a tela com o login
+    if (!activeRole) {
+        openSystemLoginModal();
+    } else {
+        updateProfileButtonUI();
+        refreshUI();
+    }
+});
+
+function openSystemLoginModal() {
+    const bodyHtml = `
+        <div class="space-y-4 text-center py-2">
+            <div class="inline-flex items-center justify-center w-14 h-14 bg-blue-600/20 text-blue-400 rounded-full mb-1">
+                <i class="fa-solid fa-shield-halved text-2xl"></i>
+            </div>
+            <h3 class="text-base font-bold text-white">ARS Mecânico Automotivo</h3>
+            <p class="text-xs text-slate-400">Digite sua senha de acesso para entrar no sistema:</p>
+            
+            <div class="text-left pt-1">
+                <input type="password" id="system-pass-input" placeholder="Digite sua senha..." class="w-full bg-slate-800 border border-slate-700 text-white text-center tracking-widest rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500">
+            </div>
+            <div class="text-[11px] text-slate-500 flex justify-between px-1">
+                <span>• Senha Admin: Acesso Total</span>
+                <span>• Senha Mecânico: Sem Financeiro</span>
+            </div>
+        </div>
+    `;
+
+    const footerHtml = `
+        <button type="button" onclick="verifySystemLogin()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-xl text-sm font-bold shadow transition">
+            Acessar Sistema
+        </button>
+    `;
+
+    openModal({
+        title: 'Identificação de Usuário',
+        icon: 'fa-lock',
+        bodyHtml,
+        footerHtml,
+        maxWidth: 'max-w-sm'
+    });
+
+    // Oculta o botão 'X' de fechar o modal para impedir burlar o login
+    const closeBtn = document.querySelector('#modal-box button[onclick="closeModal()"]');
+    if (closeBtn) closeBtn.style.display = 'none';
+
+    setTimeout(() => {
+        const input = document.getElementById('system-pass-input');
+        if (input) {
+            input.focus();
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') verifySystemLogin();
+            });
+        }
+    }, 100);
+}
+
+function verifySystemLogin() {
+    const inputVal = document.getElementById('system-pass-input').value;
+
+    if (inputVal === ACCESS_PASSWORDS.admin) {
+        setSessionRole('admin', 'Acesso Total (Administrador) liberado!');
+    } else if (inputVal === ACCESS_PASSWORDS.operacional) {
+        setSessionRole('operacional', 'Acesso Operacional liberado (Financeiro oculto).');
+    } else {
+        showToast('Senha incorreta! Tente novamente.', 'error');
+        const input = document.getElementById('system-pass-input');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+    }
+}
+
+function setSessionRole(role, welcomeMsg) {
+    activeRole = role;
+    userFinancialVisible = (role === 'admin');
+    sessionStorage.setItem('autotech_role', role);
+
+    // Restaura o botão de fechar dos modais normais do sistema
+    const closeBtn = document.querySelector('#modal-box button[onclick="closeModal()"]');
+    if (closeBtn) closeBtn.style.display = '';
+
+    closeModal();
+    updateProfileButtonUI();
+    refreshUI();
+    showToast(welcomeMsg, 'success');
+}
+
+// Função para sair/trocar de perfil ao clicar no botão do cabeçalho
+function toggleFinancialProfile() {
+    sessionStorage.removeItem('autotech_role');
+    activeRole = null;
+    userFinancialVisible = false;
+    openSystemLoginModal();
+}
+
+function updateProfileButtonUI() {
+    const btn = document.getElementById('profile-toggle-btn');
+    if (!btn) return;
+    if (activeRole === 'admin') {
+        btn.innerHTML = `<i class="fa-solid fa-user-shield text-emerald-400"></i> <span class="hidden sm:inline">Admin (Total) • Sair</span>`;
+        btn.className = "flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition text-white";
+    } else {
+        btn.innerHTML = `<i class="fa-solid fa-wrench text-amber-400"></i> <span class="hidden sm:inline">Operacional • Trocar</span>`;
+        btn.className = "flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition text-amber-300";
+    }
+}
+
 /**
- * CONTROLE DE PERFIL FINANCEIRO E TEMAS (DARK/LIGHT)
+ * CONTROLE DE PERFIS DE ACESSO E TEMAS
+ */
+let currentTheme = localStorage.getItem('autotech_theme') || 'dark';
+
+// Define as senhas de cada perfil
+const ACCESS_PASSWORDS = {
+    admin: localStorage.getItem('autotech_admin_pass') || '047874',       // Acesso Total
+    operacional: localStorage.getItem('autotech_oper_pass') || '123456'  // Acesso Restrito ao Financeiro
+};
+
+// Recupera o perfil ativo na sessão atual
+let activeRole = sessionStorage.getItem('autotech_role') || null;
+let userFinancialVisible = (activeRole === 'admin');
+
+
+
+/**
+ * CONTROLE DE PERFIL FINANCEIRO
  */
 // Ativado por padrão (true) caso o localStorage esteja vazio
-let userFinancialVisible = localStorage.getItem('autotech_profile_visible') === null ? true : localStorage.getItem('autotech_profile_visible') === 'true';
-let currentTheme = localStorage.getItem('autotech_theme') || 'dark';
-let financialPassword = localStorage.getItem('autotech_financial_pass') || '047874';
+/*let userFinancialVisible = localStorage.getItem('autotech_profile_visible') === null ? true : localStorage.getItem('autotech_profile_visible') === 'true';
+let financialPassword = localStorage.getItem('autotech_financial_pass') || '047874';*/
+
 
 /**
  * Alterna ou solicita senha para o Perfil Financeiro
  */
+/*
 function toggleFinancialProfile() {
     if (userFinancialVisible) {
         userFinancialVisible = false;
@@ -85,7 +216,9 @@ function updateProfileButtonUI() {
         btn.className = "flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition text-amber-300";
     }
 }
+*/
 
+/*
 function toggleTheme() {
     currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('autotech_theme', currentTheme);
@@ -111,8 +244,7 @@ function updateThemeButtonUI() {
         btn.innerHTML = `<i class="fa-solid fa-sun text-amber-400"></i> <span class="hidden sm:inline">Claro</span>`;
     }
 }
-
-
+*/
 
 // CADASTRAR MECÂNICOS
 function promptNewMechanic() {
@@ -134,9 +266,6 @@ function promptNewMechanic() {
         showToast(`Técnico "${trimmed}" adicionado à lista!`, 'success');
     }
 }
-
-
-
 
 /**
  * ARQUITETURA DE DADOS E PERSISTÊNCIA (localStorage)
@@ -203,8 +332,6 @@ function loadDatabase() {
     updateHeaderWorkshop();
 }
 
-
-
 /**
  * Salva todo o estado no localStorage
  */
@@ -236,8 +363,6 @@ function generateId(prefix = 'id') {
     return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }*/
 
-
-
 function formatCurrency(val) {
     if (!userFinancialVisible) {
         return 'R$ •••••'; // Oculta valores financeiros se o perfil estiver restrito
@@ -245,9 +370,6 @@ function formatCurrency(val) {
     const num = parseFloat(val) || 0;
     return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
-
-
-
 
 function formatDateTime(isoStr) {
     if (!isoStr) return '-';
